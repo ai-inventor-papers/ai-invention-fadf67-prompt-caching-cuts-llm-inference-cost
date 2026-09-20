@@ -1,0 +1,140 @@
+# Prompt Caching Implementations Survey
+
+## Summary
+
+This survey documents how major LLM serving systems (vLLM, SGLang, TensorRT-LLM, LMCache) and commercial API providers (Anthropic, OpenAI, DeepSeek, Gemini) implement prompt caching — including mechanism, granularity, matching criteria, pricing, and TTL. A prior-art scan assesses novelty of three alternate hypotheses: chunk-level KV caching, approximate/speculative KV reuse, and cache-optimal prompt structuring. Key findings: (1) chunk-level caching is largely anticipated by SGLang's radix tree, LMCache, CacheBlend (EuroSys'25), and Prompt Cache (MLSys'24), but semantic-chunk granularity under heterogeneous workloads with a hit-rate model remains open; (2) approximate/speculative KV reuse is strong prior art via CacheBlend's selective recomputation, though 'warm-start + low-rank correction' is not yet standard; (3) vendor guidance on prompt ordering exists (Anthropic, OpenAI), but a quantified cost-vs-quality tradeoff study accounting for position sensitivity ('lost in the middle') is a genuine gap.
+
+## Research Findings
+
+## 1. The Two-Phase Cost Model: Why Prompt Caching Works
+
+LLM inference operates in two phases: prefill and decode [1, 2]. During the **prefill phase**, the entire input prompt is processed in parallel to compute Key (K) and Value (V) matrix projections for every token at every attention layer, storing them in the KV cache. Prefill is compute-bound and dominates time-to-first-token (TTFT), especially for long prompts [1, 2]. During the **decode phase**, each new output token is generated sequentially by attending to the previously cached KV vectors, making decode memory-bandwidth-bound [1, 2]. Prompt caching eliminates redundant prefill computation by storing and reusing the KV cache of previously processed prompt prefixes across requests, reducing both latency and cost.
+
+## 2. Open-Source Serving Systems
+
+### vLLM — Automatic Prefix Caching (APC)
+vLLM's APC caches at the **block level** using hash-based matching [3, 4, 5]. The KV cache is managed as fixed-size blocks (default 16 tokens per block) via PagedAttention [4]. Each block is hashed by its token sequence, and new requests walk tokens block-by-block checking for hash matches [4]. Hits only occur at block boundaries — a partial-block match (e.g., 17 tokens hitting on block 0 but missing block 1) requires recomputation of the remainder [4, 5]. APC is **enabled by default since vLLM v0.6** and can be tuned with `--enable-prefix-caching` and `--block-size` flags [3, 5]. Matching requires **exact prefix alignment from token 0** [4, 5]. Eviction follows LRU with respect to the PagedAttention memory pool [3].
+
+### SGLang — RadixAttention
+SGLang uses a fundamentally different approach with a **radix tree** (compressed trie) over token sequences [6, 7]. Each node stores KV tensors for a token subsequence, enabling **token-level granularity** matching at any boundary — not just block-aligned [5, 6]. A new request traverses the tree from the root, consuming cached nodes for as long as its tokens match, then computes fresh nodes for the divergent suffix [6]. RadixAttention is **always on** (it is the core of SGLang, not an optional flag) [5, 7]. It supports **partial overlap at any token boundary** and uses LRU eviction with recursive leaf eviction [6]. The 2025 KVFlow benchmark (arXiv:2507.07400) found radix-cache approaches achieve up to **1.83× speedup** on workloads with large prompts [5]. SGLang also implements cache-aware scheduling to maximize hit rates [6].
+
+### TensorRT-LLM — Block-Level KV Cache Reuse
+TensorRT-LLM stores KV state in fixed-token blocks with **block-level prefix reuse** via hash-based search structures [8, 9, 10]. KV cache reuse is **enabled by default** (`enableBlockReuse=true`) [8]. Eviction uses LRU, but TensorRT-LLM uniquely offers **priority-based eviction** via the Executor API, letting users assign retention priority (0–100) and duration to specific token ranges (e.g., system prompts can be set to maximum priority) [10]. Internal benchmarks show priority-based eviction increases cache hit rate by ~20% [10]. A new **KV Cache Event API** emits real-time events when blocks are stored/removed/updated, enabling KV-aware routing across serving instances [10]. An RFC for **semantic KV cache reuse** (arXiv:2509.24832, SemShareKV) is under active discussion as of June 2026 [11].
+
+### LMCache — Chunk-Level KV Cache Layer
+LMCache is the first open-source KV caching layer that operates **independently of the inference engine** (vLLM, SGLang) and supports **cross-instance KV cache sharing** [12, 13]. It stores KV caches at a **configurable chunk granularity** (default 256 tokens) — much larger than engine page sizes — to maximize storage bandwidth utilization [12, 13]. LMCache implements a **multi-tier storage hierarchy**: GPU memory → CPU DRAM (pinned) → local disk (NVMe) → remote storage (Redis, Mooncake, S3) [13, 14]. It supports two modes: **Storage Mode** (prefix reuse across queries via offloading) and **Transport Mode** (prefill-decode disaggregation via cross-engine KV transfer) [12]. CacheBlend integration enables **non-prefix chunk reuse** with selective recomputation [15]. LMCache achieves up to **15× throughput improvement** over built-in caching [12].
+
+## 3. Commercial API Providers
+
+### Anthropic
+Anthropic provides **explicit prompt caching** via `cache_control` breakpoints and **automatic caching** (top-level `cache_control` field) [16, 17]. Up to 4 explicit breakpoints can be placed on content blocks [16]. Default TTL is **5 minutes** (refreshed on each cache hit); an extended **1-hour TTL** is available at additional cost [16]. Pricing multipliers: 5-minute cache write = **1.25× base input**, 1-hour cache write = **2.0× base input**, cache read = **0.1× base input** (90% discount) [16]. Minimum cacheable prefix: **1,024 tokens** (Haiku 3.5 requires 4,096) [16]. Cache keys match the **full prefix** (tools, system, messages in order) up to the cache_control breakpoint [16]. Vendor guidance recommends placing **static content first, dynamic content last** [16].
+
+### OpenAI
+OpenAI provides **automatic prompt caching** — no explicit control, fully server-side [18, 19]. Cache hits require an **exact, repeated prefix match** starting from token 0, with a **1,024-token minimum** [18, 19, 20]. Originally launched October 2024 with a 50% discount; current discount is **up to 90%** on newer models (cached input rate ~0.1× base) [18, 19, 21]. Cache TTL: **5 minutes** (extended to **24 hours** on newer models) [21]. There is no write premium — cache misses are billed at normal input rate [21]. Vendor guidance recommends placing static, reusable content (tool definitions, system instructions, examples) at the beginning of the prompt [18, 21].
+
+### DeepSeek
+DeepSeek provides **automatic context caching on disk** enabled by default for all users [22, 23]. Cache hits are billed at approximately **10% of input rate** (~90% discount) with no storage fee [22, 23]. DeepSeek uses **cache prefix units** — complete, independently persisted prefixes matching from the start [22]. The system automatically detects common prefixes across multiple requests and persists them as reusable units [22]. Responses include `prompt_cache_hit_tokens` and `prompt_cache_miss_tokens` fields for monitoring [22]. Cache construction takes seconds; caches are automatically cleared within hours to days when no longer in use [22].
+
+### Gemini (Google)
+Gemini provides both **explicit context caching** (create a `cachedContent` object) and **implicit caching** (zero-setup, automatic for Gemini 2.5+ models) [24, 25]. Pricing is unique: cached input tokens are read at a reduced rate **plus a per-hour storage fee** ($0.50–$4.50 per million tokens per hour depending on model) [24, 25]. Implicit caching delivers ~75–90% discount with no storage fee or write premium [21]. Explicit caching requires a minimum of **2,048 tokens** (some models) [21]. TTL can be set to any duration on explicit caches; the storage fee makes long-lived caches expensive if not frequently read [24].
+
+## 4. Prior-Art Scan for Alternate Hypotheses
+
+### Alternate 1: Chunk-Level KV Cache Reuse
+**Strong prior art exists.** SGLang's RadixAttention already performs tree/chunk-level caching with token granularity and is production-deployed [6, 7]. LMCache implements configurable chunk-level storage (default 256 tokens) with cross-instance sharing [12, 13]. Prompt Cache (MLSys'24) pre-computes attention states for reusable 'prompt modules' using a schema, achieving 8–60× latency reduction [26]. CacheBlend (EuroSys'25 Best Paper) reuses precomputed KV caches for arbitrary (non-prefix) chunks with selective recomputation of a small token subset, achieving 2.2–3.3× TTFT reduction [27, 28]. A 2026 experimental study (arXiv:2603.20218) provides a systematic taxonomy and evaluation of chunk-level caching approaches, showing existing techniques are complementary and can be combined for up to 5% accuracy improvement [28]. **Novelty verdict:** Pure chunk-level caching is largely anticipated. A remaining gap is a **semantic-chunk-granularity hit-rate model** that predicts cache utility under heterogeneous RAG workloads with varying chunk overlap patterns.
+
+### Alternate 2: Approximate/Speculative KV Reuse
+**CacheBlend is direct prior art** for approximate KV reuse with correction [27, 28]. It reuses precomputed KV caches regardless of prefix position, then selectively recomputes KV values for a small subset of tokens to recover cross-attention — achieving quality parity with full prefill [27]. The 2026 experimental study identifies two families: **recomputation-based** (CacheBlend, Epic, CacheClip, Droidspeak) and **attention-reshaping** (Link0, APE, SEL, plus fine-tuning approaches TurboRAG, BlockAttention, KVLink) [28]. The TensorRT-LLM Semantic KV Cache Reuse RFC (June 2026) proposes engine-side hooks for semantic donor discovery, with SemBlend/SGLang as a proof point [11]. **Novelty verdict:** CacheBlend's selective recomputation is strong prior art. A 'warm-start + low-rank correction' framing that avoids full token recomputation is **not yet standard** — the existing approaches either recompute selected tokens or reshape attention scores. An approach using a low-rank adapter or lightweight correction module to adjust cached KV values without token-level recomputation could remain novel, but requires careful characterization against CacheBlend's reported 2.2–3.3× TTFT gains.
+
+### Alternate 3: Cache-Optimal Prompt Structuring
+**Vendor guidance already exists** that partially validates this direction. Anthropic's documentation explicitly instructs users to place static content first and dynamic content last [16]. OpenAI's docs recommend the same pattern [18, 21]. The ProjectDiscovery case study demonstrates a **7% → 84% cache hit rate** improvement by relocating dynamic working memory from system prompt to user message [21]. However, a critical **counter-consideration** is position sensitivity: Liu et al. (arXiv:2307.03172) showed LLMs exhibit U-shaped attention — better performance on information placed at the beginning or end of context, with degraded performance for middle-positioned content [29]. This means reordering prompts for caching could inadvertently move important content into a position the model attends to less. **Novelty verdict:** Vendor guidance and the ProjectDiscovery case validate the general approach. The **gap** is a systematic, **quantified cost-vs-quality tradeoff study** that simultaneously measures cache hit rates and model accuracy under different prompt orderings, across multiple models and tasks. No published work integrates the 'lost in the middle' position-sensitivity literature with prompt caching economics.
+
+## 5. Feature Matrix
+
+| System | Cache Granularity | Matching Criterion | Control | Eviction/TTL | Pricing | Approx. Reuse |
+|--------|------------------|-------------------|---------|-------------|---------|---------------|
+| vLLM | Block (16 tokens) | Exact block hash from token 0 | Automatic (default) | LRU within GPU pool | Free (open source) | No |
+| SGLang | Token-level (radix tree) | Exact prefix, any boundary | Automatic (always on) | LRU leaf eviction | Free (open source) | No (SemBlend RFC) |
+| TensorRT-LLM | Block | Exact block hash from token 0 | Automatic (default) | Priority-aware LRU + duration | Free (open source) | No (RFC open) |
+| LMCache | Chunk (256 tokens default) | Exact chunk hash, cross-instance | Configurable | LRU across tiers | Free (open source) | Yes (CacheBlend) |
+| Anthropic | Full prefix | Exact prefix match | Explicit breakpoints + auto | 5min / 1hr TTL | 1.25×–2.0× write, 0.1× read | No |
+| OpenAI | Full prefix | Exact prefix from token 0 | Automatic | 5min / 24hr TTL | No write premium, 0.1× read | No |
+| DeepSeek | Full prefix unit | Exact prefix match | Automatic | Hours–days | 0.1× read, no write | No |
+| Gemini | Full context | Exact match (explicit/implicit) | Explicit + implicit | User-set (explicit) | Reduced read + $/MTok/hr storage | No |
+
+## Sources
+
+[1] [Prefill vs Decode: LLM Inference Phases Explained](https://redis.io/blog/prefill-vs-decode/) (2026) — Explains the two-phase LLM inference model: prefill processes the entire input prompt in parallel (compute-bound, determines TTFT), while decode generates tokens sequentially using cached KV states (memory-bandwidth-bound).
+
+[2] [Prefill-decode disaggregation | LLM Inference Handbook](https://bentoml.com/llm/inference-optimization/prefill-decode-disaggregation) — Confirms prefill is compute-bound due to large matrix operations on all tokens at once, while decode is memory-bandwidth-bound as it reuses cached KV tensors to generate one token at a time.
+
+[3] [Automatic Prefix Caching — vLLM Design Documentation](https://docs.vllm.ai/en/stable/design/prefix_caching/) (2026) — vLLM's APC caches KV-cache blocks of processed requests and reuses them when new requests share the same prefix. Uses block-level hashing integrated with PagedAttention (default 16 tokens per block).
+
+[4] [Prefix Caching in vLLM & SGLang: Block Hashing vs Radix Tree](https://llm-academy.dev/optimization/prefix-caching/) (2026) — Detailed comparison of vLLM's block-level hash matching (16-token blocks, exact block-aligned matches only) vs SGLang's token-level radix tree (partial overlaps at any boundary). Reports 1.83× speedup for radix approaches. vLLM APC is enabled by default since v0.6.
+
+[5] [vLLM Prefix Caching Explained 2026](https://packet.ai/blog/vllm-prefix-caching) (2026) — Confirms vLLM manages KV cache in fixed-size blocks of 16 tokens each through PagedAttention, with hash-based lookup for cache hits. APC is on by default.
+
+[6] [Fast and Expressive LLM Inference with RadixAttention and SGLang](https://www.lmsys.org/blog/2024-01-17-sglang/) (Lianmin Zheng, Liangsheng Yin, Zhiqiang Xie, Jeff Huang, Chuyue Sun, Cody Hao Yu, Shiyi Cao, Christos Kozyrakis, Ion Stoica, Joseph E. Gonzalez, Clark Barrett, Ying Sheng; 2024) — Introduces RadixAttention: KV cache stored in a radix tree with token-level granularity, LRU eviction, and cache-aware scheduling. Enables automatic KV cache reuse for shared prefixes, self-consistency, multi-turn chat, and tree-of-thought patterns.
+
+[7] [SGLang: Efficient Execution of Structured Language Model Programs](https://arxiv.org/abs/2312.07104) (Lianmin Zheng, Liangsheng Yin, Zhiqiang Xie, Jeff Huang, Chuyue Sun, Cody Hao Yu, Shiyi Cao, Christos Kozyrakis, Ion Stoica, Joseph E. Gonzalez, Clark Barrett, Ying Sheng; 2024) — Original SGLang paper (NeurIPS 2024). Proposes RadixAttention for automatic KV cache reuse via radix tree data structure, achieving up to 5× throughput improvement over Guidance and vLLM baselines.
+
+[8] [KV cache reuse — TensorRT-LLM Documentation](https://nvidia.github.io/TensorRT-LLM/advanced/kv-cache-reuse.html) (2026) — Documents TensorRT-LLM's block-level KV cache reuse. Enabled by default via enableBlockReuse=true. Uses hash-based search structure for matching prefix blocks. LRU eviction when memory is needed. Reusable only after request terminates.
+
+[9] [5x Faster TTFT with NVIDIA TensorRT-LLM KV Cache Early Reuse](https://developer.nvidia.com/blog/5x-faster-time-to-first-token-with-nvidia-tensorrt-llm-kv-cache-early-reuse/) (2025) — NVIDIA blog post on TensorRT-LLM KV cache reuse for system prompts, sharing computation across concurrent users and achieving up to 5× TTFT improvement.
+
+[10] [Introducing New KV Cache Reuse Optimizations in NVIDIA TensorRT-LLM](https://developer.nvidia.com/blog/introducing-new-kv-cache-reuse-optimizations-in-nvidia-tensorrt-llm/) (John Thomson, Anjali Shah, Laikh Tewari; 2025) — Describes priority-based KV cache eviction (user-assigned retention priority and duration per token range, ~20% hit rate improvement) and the KV Cache Event API for real-time cache state tracking across executors.
+
+[11] [[RFC]: Semantic KV Cache Reuse — TensorRT-LLM Issue #14918](https://github.com/NVIDIA/TensorRT-LLM/issues/14918) (zbennett10; 2026) — RFC (June 2026) proposing engine-side hooks for semantic KV cache reuse in TensorRT-LLM, referencing SemShareKV (arXiv:2509.24832) and SemBlend/SGLang work. Proposes conservative strategy: exact prefix unchanged, semantic donor discovery as optional external decision.
+
+[12] [LMCache: An Efficient KV Cache Layer for Enterprise-Scale LLM Inference](https://arxiv.org/html/2510.09665v2) (Yuhan Liu, Jiayi Yao, Yihua Cheng, Yuwei An, Xiaokun Chen, Shaoting Feng, Yuyang Huang, Samuel Shen, Rui Zhang, Kuntai Du, Junchen Jiang; 2025) — LMCache paper (arXiv:2510.09665). First open-source KV caching layer supporting cross-request and cross-instance cache sharing. Configurable chunk size (default 256 tokens), multi-tier storage (GPU/CPU/disk/remote), supports both prefix reuse and PD disaggregation. Up to 15× throughput improvement.
+
+[13] [LMCache Architecture Overview](https://docs.lmcache.ai/developer_guide/architecture.html) (2026) — Documents LMCache's multi-tier storage (GPU/CPU/disk/remote), connector integration with vLLM/SGLang, configurable chunking (default 256 tokens) and hashing scheme, cross-request/cross-instance cache lookups.
+
+[14] [LMCache GitHub Repository](https://github.com/lmcache/lmcache) — Describes LMCache as persistent, tiered KV cache offloading: GPU → CPU → disk → remote backends, enabling reuse across requests, engines, and nodes.
+
+[15] [CacheBlend — LMCache KV Cache Optimization](https://docs.lmcache.ai/kv_cache_optimizations/cacheblend.html) (2026) — CacheBlend integration in LMCache: enables reuse of KV cache for any repeated text chunk (not just prefix) by selectively recomputing a small fraction of tokens at chunk boundaries. Uses 'blend' engine type.
+
+[16] [Prompt caching — Claude Platform Docs (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) (2026) — Anthropic's prompt caching: explicit cache_control breakpoints (max 4) or automatic caching. 5-min default TTL (1-hour available at 2× cost). Cache read = 0.1× base input (90% discount). Write = 1.25× (5-min) or 2.0× (1-hour). Min 1,024 tokens. Recommends static-first prompt ordering.
+
+[17] [Claude Prompt Caching Pricing: 5-Min vs 1-Hour Cache (2026)](https://www.respan.ai/articles/claude-prompt-caching) (2026) — Details Anthropic's cache_control breakpoints (up to 4), 5-min and 1-hour TTL tiers, and pricing comparison across Claude models.
+
+[18] [Prompt caching — OpenAI API Docs](https://developers.openai.com/api/docs/guides/prompt-caching) (2026) — OpenAI's automatic prompt caching: enabled by default, exact prefix match from token 0, 1,024-token minimum, up to 90% discount on cached input tokens, no write premium. Recommends static content first.
+
+[19] [Prompt Caching in the API | OpenAI](https://openai.com/index/api-prompt-caching/) (2024) — OpenAI's announcement (October 2024) of automatic prompt caching with 50% discount (since raised to 90%). No user changes required for automatic caching.
+
+[20] [Why does prompt caching require at least 1024 tokens? — OpenAI Community](https://community.openai.com/t/why-does-prompt-caching-requires-at-least-1024-tokens/1363167) (2025) — Confirms OpenAI's 1,024-token minimum prefix requirement for cache activation. Below this threshold, requests bypass the cache and incur full pricing.
+
+[21] [Prompt Caching in 2026: Cut LLM Costs, Keep Quality](https://www.digitalapplied.com/blog/prompt-caching-2026-cut-llm-costs-engineering-guide) (2026) — Comprehensive 2026 cross-provider guide. Reports ProjectDiscovery case study (7% → 84% cache hit rate via prompt restructuring). Documents pricing across Anthropic, OpenAI, DeepSeek, Gemini. Notes cache keys are literal token sequences — single character change breaks hit.
+
+[22] [Context Caching — DeepSeek API Docs](https://api-docs.deepseek.com/guides/kv_cache/) (2026) — DeepSeek's automatic context caching on disk. Cache hits billed at ~10% of input rate. Uses 'cache prefix units' — complete, independently persisted prefixes. Automatically detects common prefixes across requests. No explicit user control.
+
+[23] [DeepSeek API introduces Context Caching on Disk](https://api-docs.deepseek.com/news/news0802/) (2024) — DeepSeek's August 2024 announcement of context caching with up to 90% cost reduction on cache hits ($0.014/M tokens).
+
+[24] [Gemini Developer API pricing](https://ai.google.dev/gemini-api/docs/pricing) (2026) — Gemini context caching pricing: cached input tokens at reduced rate plus per-hour storage fee ($0.50–$4.50/MTok/hr depending on model). Implicit caching for 2.5+ models with no storage fee. Both explicit and implicit caching available.
+
+[25] [Gemini API Pricing (2026): Flash, Pro, and Flash-Lite Per-Token Costs](https://www.morphllm.com/gemini-api-pricing) (2026) — Documents Gemini's dual-cost caching model: reduced per-token cached input rate plus per-hour storage fee. Gemini 2.5 Flash: cached input $0.03/1M, storage $1.00/hr.
+
+[26] [Prompt Cache: Modular Attention Reuse for Low-Latency Inference (MLSys 2024)](https://arxiv.org/abs/2311.04934) (In Gim, Guojun Chen, Seung-seob Lee, Nikhil Sarda, Anurag Khandelwal, Lin Zhong; 2024) — Introduces prompt modules — reusable text segments defined via schema with positional accuracy guarantees. Pre-computes and stores attention states for frequently occurring segments. Achieves 8× GPU and 60× CPU latency reduction for long prompts.
+
+[27] [CacheBlend: Fast Large Language Model Serving for RAG with Cached Knowledge Fusion (EuroSys 2025 Best Paper)](https://arxiv.org/abs/2405.16444) (Jiayi Yao, Hanchen Li, Yuhan Liu, Siddhant Ray, Yihua Cheng, Qizheng Zhang, Kuntai Du, Shan Lu, Junchen Jiang; 2024) — CacheBlend reuses precomputed KV caches regardless of prefix position, then selectively recomputes KV values for a small token subset to recover cross-attention. Achieves 2.2–3.3× TTFT reduction and 2.8–5× throughput increase without quality loss.
+
+[28] [An Experimental Study of KV Cache Reuse Strategies in Chunk-Level Caching Systems](https://arxiv.org/html/2603.20218v1) (Samuel Cestola, Tianxiang Xia, Zheng Weiyan, Zheng Pengfei, Diego Didona; 2026) — 2026 systematic study of CLC approaches. Identifies two families: recomputation-based (CacheBlend, Epic, CacheClip, Droidspeak) and attention-reshaping (Link0, APE, SEL, TurboRAG, BlockAttention, KVLink). Shows existing approaches are complementary; combining them achieves up to 5% higher accuracy.
+
+[29] [Lost in the Middle: How Language Models Use Long Contexts](https://arxiv.org/abs/2307.03172) (Nelson F. Liu, Kevin Lin, John Hewitt, Ashwin Paranjape, Michele Bevilacqua, Fabio Petroni, Percy Liang; 2023) — Demonstrates LLMs exhibit U-shaped attention: better performance when relevant information is at beginning or end of context, with degraded performance in the middle. Critical consideration for prompt reordering to optimize caching.
+
+## Verification
+
+Numbered citations resolve to unique listed sources. Passage checks test text occurrence, not claim truth or entailment. Author/year metadata and locators are not independently verified. Details: `research_verification.json`.
+
+No optional exact passages supplied; no passage checks performed.
+
+## Follow-up Questions
+
+- What is the minimum similarity threshold at which CacheBlend's selective recomputation becomes profitable — i.e., how similar must two chunks be before approximate KV reuse saves more than it costs in recomputation overhead?
+- Does vLLM's APC support non-prefix block sharing (i.e., can two requests reuse KV blocks that match somewhere in the middle, not starting from token 0), or is this strictly a prefix-only mechanism?
+- How does the 'lost in the middle' position-sensitivity effect interact with prompt reordering for cache optimization — does moving static content to the front systematically improve or degrade model accuracy for content previously in the middle?
+- What is the optimal chunk size for LMCache in RAG workloads with varying document lengths, and how does the 256-token default interact with attention quality across different model architectures?
+- Can the TensorRT-LLM Semantic KV Cache RFC's conservative approach (discovery-only, exact-equivalent materialization first) be extended to safe approximate reuse, and what quality guarantees would be needed?
+
+---
+*Generated by AI Inventor Pipeline*
