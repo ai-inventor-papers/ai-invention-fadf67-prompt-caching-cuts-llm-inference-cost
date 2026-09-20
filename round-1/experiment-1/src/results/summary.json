@@ -1,0 +1,105 @@
+{
+  "ranking": [
+    {
+      "strategy": "speculative",
+      "avg_flops_saved_pct": 65.883,
+      "avg_peak_memory_GB": 247.202
+    },
+    {
+      "strategy": "chunk",
+      "avg_flops_saved_pct": 58.695,
+      "avg_peak_memory_GB": 206.045
+    },
+    {
+      "strategy": "restructure",
+      "avg_flops_saved_pct": 58.688,
+      "avg_peak_memory_GB": 206.045
+    },
+    {
+      "strategy": "monolithic",
+      "avg_flops_saved_pct": 54.941,
+      "avg_peak_memory_GB": 246.415
+    }
+  ],
+  "best_per_workload": {
+    "high_sharing": {
+      "strategy": "monolithic",
+      "flops_saved_pct": 68.795,
+      "hit_rate_pct": 79.3,
+      "peak_memory_GB": 134.218
+    },
+    "partial_overlap": {
+      "strategy": "chunk",
+      "flops_saved_pct": 79.374,
+      "hit_rate_pct": 99.9,
+      "peak_memory_GB": 1.049
+    },
+    "similar": {
+      "strategy": "speculative",
+      "flops_saved_pct": 64.508,
+      "hit_rate_pct": 87.4,
+      "peak_memory_GB": 691.012
+    },
+    "variable_order": {
+      "strategy": "chunk",
+      "flops_saved_pct": 86.61,
+      "hit_rate_pct": 99.9,
+      "peak_memory_GB": 1.049
+    }
+  },
+  "survival_rule_ge_10pts_on_2_of_4": {
+    "chunk": {
+      "workloads_beating_monolithic_by_10pts": [
+        "variable_order"
+      ],
+      "n_wins": 1,
+      "survives": false
+    },
+    "speculative": {
+      "workloads_beating_monolithic_by_10pts": [
+        "similar"
+      ],
+      "n_wins": 1,
+      "survives": false
+    },
+    "restructure": {
+      "workloads_beating_monolithic_by_10pts": [
+        "variable_order"
+      ],
+      "n_wins": 1,
+      "survives": false
+    }
+  },
+  "monolithic_baseline_flops_saved_pct": {
+    "high_sharing": 68.795,
+    "partial_overlap": 74.761,
+    "similar": 0.0,
+    "variable_order": 76.207
+  },
+  "crossover_wide_overlap": {
+    "monolithic": {
+      "flops_saved_pct": 2.683,
+      "prefill_flops_saved_pct": 3.2,
+      "hit_rate_pct": 3.2,
+      "peak_memory_GB": 514.222
+    },
+    "chunk": {
+      "flops_saved_pct": 83.41,
+      "prefill_flops_saved_pct": 99.5,
+      "hit_rate_pct": 99.7,
+      "peak_memory_GB": 2.517
+    },
+    "speculative": {
+      "flops_saved_pct": 8.836,
+      "prefill_flops_saved_pct": 10.54,
+      "hit_rate_pct": 12.4,
+      "peak_memory_GB": 516.738
+    },
+    "restructure": {
+      "flops_saved_pct": 83.368,
+      "prefill_flops_saved_pct": 99.45,
+      "hit_rate_pct": 99.5,
+      "peak_memory_GB": 2.517
+    }
+  }
+}

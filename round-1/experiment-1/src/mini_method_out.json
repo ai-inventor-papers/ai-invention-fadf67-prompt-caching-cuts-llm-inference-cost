@@ -1,0 +1,109 @@
+{
+  "metadata": {
+    "method_name": "kv_cache_strategy_simulation",
+    "description": "Analytical simulation of four KV-cache reuse strategies (monolithic prefix, chunk-level, speculative approximate, cache-optimal restructuring) across four synthetic workloads; metrics: prefill-FLOP savings, peak KV memory, hit rate.",
+    "model_constants": {
+      "layers": 32,
+      "hidden_dim": 4096,
+      "heads": 32,
+      "head_dim": 128,
+      "kv_bytes_per_token_fp16": 524288
+    },
+    "parameters": {
+      "seed": 42,
+      "n_requests_full": 1000,
+      "memory_budget_tokens_default": 20000000,
+      "ttl_seconds": 600.0,
+      "budget_sweep_tokens": [
+        200000,
+        500000,
+        1000000,
+        2000000,
+        5000000,
+        10000000,
+        20000000,
+        50000000
+      ],
+      "spec_tau": 0.7,
+      "spec_ngram_n": 1,
+      "spec_correction_fraction": 0.15,
+      "spec_tau_sweep": [
+        0.5,
+        0.7,
+        0.85
+      ],
+      "spec_ngram_sweep": [
+        1,
+        4,
+        8
+      ],
+      "spec_correction_sweep": [
+        0.05,
+        0.15,
+        0.3
+      ],
+      "workload_kinds": [
+        "high_sharing",
+        "partial_overlap",
+        "similar",
+        "variable_order"
+      ],
+      "strategies": [
+        "monolithic",
+        "chunk",
+        "speculative",
+        "restructure"
+      ]
+    },
+    "total_runtime_s": 340.2
+  },
+  "datasets": [
+    {
+      "dataset": "kv_cache_strategy_grid",
+      "examples": [
+        {
+          "input": "workload=high_sharing; n_requests=1000; memory_budget_tokens=20000000; task=predict per-strategy prefill-FLOP savings, peak KV memory, and hit rate for the four KV-cache strategies under the shared 7B-class cost model",
+          "output": "{\"best_strategy\": \"monolithic\", \"monolithic_flops_saved_pct\": 68.7951}",
+          "metadata_workload": "high_sharing",
+          "metadata_memory_budget_tokens": "20000000",
+          "metadata_tau": "None",
+          "metadata_ngram_n": "None",
+          "metadata_correction_fraction": "None",
+          "metadata_n_strategies": "4",
+          "predict_monolithic": "{\"strategy\": \"monolithic\", \"flops_saved_pct\": 68.7951, \"prefill_flops_saved_pct\": 79.3, \"hit_rate_pct\": 79.3, \"peak_memory_GB\": 134.2177, \"peak_cached_tokens\": 256000, \"evictions\": 0, \"ttl_expiries\": 85, \"approximate\": false, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"5.555148e+15\", \"cached_flops\": \"1.733478e+15\"}",
+          "predict_chunk": "{\"strategy\": \"chunk\", \"flops_saved_pct\": 68.7951, \"prefill_flops_saved_pct\": 79.3, \"hit_rate_pct\": 79.3, \"peak_memory_GB\": 134.2177, \"peak_cached_tokens\": 256000, \"evictions\": 0, \"ttl_expiries\": 85, \"approximate\": false, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"5.555148e+15\", \"cached_flops\": \"1.733478e+15\"}",
+          "predict_speculative": "{\"strategy\": \"speculative\", \"flops_saved_pct\": 58.4758, \"prefill_flops_saved_pct\": 67.405, \"hit_rate_pct\": 79.3, \"peak_memory_GB\": 134.2177, \"peak_cached_tokens\": 256000, \"evictions\": 0, \"ttl_expiries\": 85, \"approximate\": true, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"5.555148e+15\", \"cached_flops\": \"2.306729e+15\"}",
+          "predict_restructure": "{\"strategy\": \"restructure\", \"flops_saved_pct\": 68.7951, \"prefill_flops_saved_pct\": 79.3, \"hit_rate_pct\": 79.3, \"peak_memory_GB\": 134.2177, \"peak_cached_tokens\": 256000, \"evictions\": 0, \"ttl_expiries\": 85, \"approximate\": false, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"5.555148e+15\", \"cached_flops\": \"1.733478e+15\"}"
+        },
+        {
+          "input": "workload=partial_overlap; n_requests=1000; memory_budget_tokens=20000000; task=predict per-strategy prefill-FLOP savings, peak KV memory, and hit rate for the four KV-cache strategies under the shared 7B-class cost model",
+          "output": "{\"best_strategy\": \"chunk\", \"monolithic_flops_saved_pct\": 74.7613}",
+          "metadata_workload": "partial_overlap",
+          "metadata_memory_budget_tokens": "20000000",
+          "metadata_tau": "None",
+          "metadata_ngram_n": "None",
+          "metadata_correction_fraction": "None",
+          "metadata_n_strategies": "4",
+          "predict_monolithic": "{\"strategy\": \"monolithic\", \"flops_saved_pct\": 74.7613, \"prefill_flops_saved_pct\": 94.0, \"hit_rate_pct\": 94.0, \"peak_memory_GB\": 37.7487, \"peak_cached_tokens\": 72000, \"evictions\": 0, \"ttl_expiries\": 0, \"approximate\": false, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"3.477441e+15\", \"cached_flops\": \"8.776608e+14\"}",
+          "predict_chunk": "{\"strategy\": \"chunk\", \"flops_saved_pct\": 79.3742, \"prefill_flops_saved_pct\": 99.8, \"hit_rate_pct\": 99.9, \"peak_memory_GB\": 1.0486, \"peak_cached_tokens\": 2000, \"evictions\": 0, \"ttl_expiries\": 0, \"approximate\": false, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"3.477441e+15\", \"cached_flops\": \"7.172488e+14\"}",
+          "predict_speculative": "{\"strategy\": \"speculative\", \"flops_saved_pct\": 66.9273, \"prefill_flops_saved_pct\": 84.15, \"hit_rate_pct\": 99.0, \"peak_memory_GB\": 37.7487, \"peak_cached_tokens\": 72000, \"evictions\": 0, \"ttl_expiries\": 0, \"approximate\": true, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"3.477441e+15\", \"cached_flops\": \"1.150085e+15\"}",
+          "predict_restructure": "{\"strategy\": \"restructure\", \"flops_saved_pct\": 79.3477, \"prefill_flops_saved_pct\": 99.7667, \"hit_rate_pct\": 99.8, \"peak_memory_GB\": 1.0486, \"peak_cached_tokens\": 2000, \"evictions\": 0, \"ttl_expiries\": 0, \"approximate\": false, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"3.477441e+15\", \"cached_flops\": \"7.181707e+14\"}"
+        },
+        {
+          "input": "workload=similar; n_requests=1000; memory_budget_tokens=20000000; task=predict per-strategy prefill-FLOP savings, peak KV memory, and hit rate for the four KV-cache strategies under the shared 7B-class cost model",
+          "output": "{\"best_strategy\": \"speculative\", \"monolithic_flops_saved_pct\": 0.0}",
+          "metadata_workload": "similar",
+          "metadata_memory_budget_tokens": "20000000",
+          "metadata_tau": "None",
+          "metadata_ngram_n": "None",
+          "metadata_correction_fraction": "None",
+          "metadata_n_strategies": "4",
+          "predict_monolithic": "{\"strategy\": \"monolithic\", \"flops_saved_pct\": 0.0, \"prefill_flops_saved_pct\": 0.0, \"hit_rate_pct\": 0.0, \"peak_memory_GB\": 687.8659, \"peak_cached_tokens\": 1312000, \"evictions\": 0, \"ttl_expiries\": 368, \"approximate\": false, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"5.550014e+15\", \"cached_flops\": \"5.550014e+15\"}",
+          "predict_chunk": "{\"strategy\": \"chunk\", \"flops_saved_pct\": 0.0, \"prefill_flops_saved_pct\": 0.0, \"hit_rate_pct\": 0.0, \"peak_memory_GB\": 687.8659, \"peak_cached_tokens\": 1312000, \"evictions\": 0, \"ttl_expiries\": 368, \"approximate\": false, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"5.550014e+15\", \"cached_flops\": \"5.550014e+15\"}",
+          "predict_speculative": "{\"strategy\": \"speculative\", \"flops_saved_pct\": 64.5084, \"prefill_flops_saved_pct\": 74.29, \"hit_rate_pct\": 87.4, \"peak_memory_GB\": 691.0116, \"peak_cached_tokens\": 1318000, \"evictions\": 0, \"ttl_expiries\": 363, \"approximate\": true, \"quality_penalty_sum\": 21003.795, \"baseline_flops\": \"5.550014e+15\", \"cached_flops\": \"1.969789e+15\"}",
+          "predict_restructure": "{\"strategy\": \"restructure\", \"flops_saved_pct\": 0.0, \"prefill_flops_saved_pct\": 0.0, \"hit_rate_pct\": 0.0, \"peak_memory_GB\": 687.8659, \"peak_cached_tokens\": 1312000, \"evictions\": 0, \"ttl_expiries\": 368, \"approximate\": false, \"quality_penalty_sum\": 0.0, \"baseline_flops\": \"5.550014e+15\", \"cached_flops\": \"5.550014e+15\"}"
+        }
+      ]
+    }
+  ]
+}
