@@ -1,0 +1,18 @@
+{
+  "valid": true,
+  "file_errors": [],
+  "schema_errors": [],
+  "content_warnings": [],
+  "files_found": {
+    "research_out.json": {
+      "exists": true,
+      "path": "/ai-inventor/aii_data/runs/run_E9LU-es1utBL/3_invention_loop/iter_1/gen_art/gen_art_research_1/research_out.json",
+      "source_count": 29,
+      "size": 30015
+    }
+  },
+  "source_count": 29,
+  "checked_at": "2026-09-20T20:34:08.475879+00:00",
+  "passage_check_scope": "Case/whitespace-normalized text occurrence at the source URL (or archive fallback). Not claim entailment, locator verification, or author/year verification. status=error means unverified, not a misquotation.",
+  "passages": []
+}
