@@ -1,0 +1,10 @@
+[project]
+name = "caching-strategies-evaluation"
+version = "0.1.0"
+description = "Evaluation: rank four prompt-caching strategies across four workload types"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy==2.5.3",
+    "scipy==1.18.1",
+    "loguru==0.7.3",
+]

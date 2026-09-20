@@ -1,0 +1,534 @@
+{
+  "metadata": {
+    "evaluation_name": "rank_four_prompt_caching_strategies",
+    "description": "Statistical comparison of four prompt-caching strategies across four workload types with pre-specified selection rule.",
+    "baseline": "monolithic",
+    "selection_rule": "rank by mean net savings across 4 workloads; survive if >=10% relative net-savings improvement over monolithic baseline on >=2 of 4 workloads; tie-break lower memory overhead",
+    "improvement_threshold": 0.1,
+    "survival_workloads_required": 2,
+    "provenance_note": "The upstream experiment artifact (gen_art_experiment_1) produced no method_out.json at evaluation time, so this evaluation deterministically reproduces the simulation specified in gen_strat_1 (same cost model, workload generator, strategy definitions) and evaluates it. Re-running eval.py reproduces every number exactly.",
+    "memory_cost_per_gb": 0.05,
+    "memory_cost_sensitivity": [
+      0.02,
+      0.05,
+      0.1
+    ],
+    "cost_model": {
+      "layers": 32,
+      "dim": 4096,
+      "heads": 32,
+      "head_dim": 128,
+      "kv_dtype_bytes": 2,
+      "kv_bytes_per_token": 524288,
+      "prefill_flops_formula": "L*(n^2*d + n*d^2)"
+    },
+    "ranking_table": [
+      {
+        "strategy": "restructure",
+        "mean_net_savings_all_workloads": 0.6149500590611879,
+        "mean_hit_rate": 0.9922500000000001,
+        "mean_peak_cache_gb": 5.2475396095999995,
+        "rel_improvement_vs_baseline_per_workload": {
+          "high_sharing": 741321451634.8641,
+          "partial_overlap": 258874691550.45938,
+          "similar_prefixes": 800287335208.0101,
+          "variable_ordering": 659316757847.4181
+        },
+        "n_workloads_beating_baseline_10pct": 4,
+        "survives_for_iteration_2": true,
+        "decision_note": "beat baseline by >=10% on 4/4 workloads",
+        "rank": 1
+      },
+      {
+        "strategy": "chunk",
+        "mean_net_savings_all_workloads": -5.222312601237887,
+        "mean_hit_rate": 0.59456875,
+        "mean_peak_cache_gb": 119.58277242879998,
+        "rel_improvement_vs_baseline_per_workload": {
+          "high_sharing": -1910766736094.3477,
+          "partial_overlap": -8332399960966.479,
+          "similar_prefixes": -3574256947834.5845,
+          "variable_ordering": -7071826760060.139
+        },
+        "n_workloads_beating_baseline_10pct": 0,
+        "survives_for_iteration_2": false,
+        "decision_note": "only 0/4 workloads >=10% better",
+        "rank": 2
+      },
+      {
+        "strategy": "speculative",
+        "mean_net_savings_all_workloads": -38.70661442600275,
+        "mean_hit_rate": 0.9964437500000001,
+        "mean_peak_cache_gb": 791.6852314112,
+        "rel_improvement_vs_baseline_per_workload": {
+          "high_sharing": -31695403657128.617,
+          "partial_overlap": -26690188007113.453,
+          "similar_prefixes": -61946380388902.41,
+          "variable_ordering": -34494485650870.535
+        },
+        "n_workloads_beating_baseline_10pct": 0,
+        "survives_for_iteration_2": false,
+        "decision_note": "only 0/4 workloads >=10% better",
+        "rank": 3
+      },
+      {
+        "strategy": "monolithic",
+        "mean_net_savings_all_workloads": -38.99829272022315,
+        "mean_hit_rate": 0.1331375,
+        "mean_peak_cache_gb": 782.1631848448001,
+        "rel_improvement_vs_baseline_per_workload": {
+          "high_sharing": -32204559649552.71,
+          "partial_overlap": -27492985733121.0,
+          "similar_prefixes": -60941086695021.875,
+          "variable_ordering": -35354538803201.0
+        },
+        "n_workloads_beating_baseline_10pct": 0,
+        "survives_for_iteration_2": false,
+        "decision_note": "baseline (reference strategy)",
+        "rank": 4
+      }
+    ],
+    "surviving_candidates": [
+      "restructure"
+    ],
+    "regime_flags": {
+      "high_sharing": {
+        "any_alternate_beats_baseline": true,
+        "main_hypothesis_sufficient": false,
+        "best_alternate": "restructure",
+        "baseline_net_savings": -32.20455964955171,
+        "best_alternate_net_savings": 0.7413214516358642
+      },
+      "partial_overlap": {
+        "any_alternate_beats_baseline": true,
+        "main_hypothesis_sufficient": false,
+        "best_alternate": "restructure",
+        "baseline_net_savings": -27.49298573312,
+        "best_alternate_net_savings": 0.25887469155145937
+      },
+      "similar_prefixes": {
+        "any_alternate_beats_baseline": true,
+        "main_hypothesis_sufficient": false,
+        "best_alternate": "restructure",
+        "baseline_net_savings": -60.94108669502087,
+        "best_alternate_net_savings": 0.8002873352090101
+      },
+      "variable_ordering": {
+        "any_alternate_beats_baseline": true,
+        "main_hypothesis_sufficient": false,
+        "best_alternate": "restructure",
+        "baseline_net_savings": -35.3545388032,
+        "best_alternate_net_savings": 0.659316757848418
+      }
+    },
+    "mechanism_check": [
+      {
+        "cell": "high_sharing/monolithic",
+        "savings": 0.4113614410082998,
+        "hit_rate": 0.50225,
+        "consistent": false
+      },
+      {
+        "cell": "high_sharing/chunk",
+        "savings": 0.8931045163866529,
+        "hit_rate": 0.711525,
+        "consistent": true
+      },
+      {
+        "cell": "high_sharing/speculative",
+        "savings": 0.9205174334323882,
+        "hit_rate": 0.998,
+        "consistent": true
+      },
+      {
+        "cell": "high_sharing/restructure",
+        "savings": 0.921695529075864,
+        "hit_rate": 0.9970000000000001,
+        "consistent": true
+      },
+      {
+        "cell": "partial_overlap/monolithic",
+        "savings": 0.0,
+        "hit_rate": 0.0,
+        "consistent": true
+      },
+      {
+        "cell": "partial_overlap/chunk",
+        "savings": 0.5718269369545232,
+        "hit_rate": 0.39187500000000003,
+        "consistent": false
+      },
+      {
+        "cell": "partial_overlap/speculative",
+        "savings": 0.8027977260075503,
+        "hit_rate": 0.99,
+        "consistent": true
+      },
+      {
+        "cell": "partial_overlap/restructure",
+        "savings": 0.8047181373114594,
+        "hit_rate": 0.9800000000000001,
+        "consistent": true
+      },
+      {
+        "cell": "similar_prefixes/monolithic",
+        "savings": 0.02810464705913322,
+        "hit_rate": 0.030300000000000004,
+        "consistent": true
+      },
+      {
+        "cell": "similar_prefixes/chunk",
+        "savings": 0.8736425363264153,
+        "hit_rate": 0.7485999999999999,
+        "consistent": true
+      },
+      {
+        "cell": "similar_prefixes/speculative",
+        "savings": 0.9272202664586014,
+        "hit_rate": 0.999,
+        "consistent": true
+      },
+      {
+        "cell": "similar_prefixes/restructure",
+        "savings": 0.9261990305690102,
+        "hit_rate": 0.998,
+        "consistent": true
+      },
+      {
+        "cell": "variable_ordering/monolithic",
+        "savings": 0.0,
+        "hit_rate": 0.0,
+        "consistent": true
+      },
+      {
+        "cell": "variable_ordering/chunk",
+        "savings": 0.6887300911408627,
+        "hit_rate": 0.526275,
+        "consistent": true
+      },
+      {
+        "cell": "variable_ordering/speculative",
+        "savings": 0.860053152330471,
+        "hit_rate": 0.998775,
+        "consistent": true
+      },
+      {
+        "cell": "variable_ordering/restructure",
+        "savings": 0.8566954612084181,
+        "hit_rate": 0.994,
+        "consistent": true
+      }
+    ],
+    "n_requests_per_run": 1000,
+    "n_seeds": 40
+  },
+  "metrics_agg": {
+    "n_seeds_per_cell": 40,
+    "n_cells": 16,
+    "n_workloads": 4,
+    "n_strategies": 4,
+    "best_strategy_mean_net_savings": 0.6149500590611879,
+    "baseline_mean_net_savings": -38.99829272022315,
+    "n_surviving_candidates": 1.0,
+    "n_cells_with_significant_net_savings_ci_above_zero": 4.0,
+    "n_mechanism_check_inconsistencies": 2.0,
+    "n_regimes_baseline_sufficient": 0.0,
+    "baseline_hit_rate_high_sharing": 0.50225,
+    "baseline_hit_rate_similar_prefixes": 0.030300000000000004,
+    "memory_cost_per_gb_nominal": 0.05
+  },
+  "datasets": [
+    {
+      "dataset": "caching_sim_high_sharing",
+      "examples": [
+        {
+          "input": "workload=high_sharing; strategy=monolithic; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-32.2046 [-32.4751, -31.9340]; hit_rate=0.5022; peak_cache_gb=652.3184",
+          "eval_net_savings_mean": -32.20455964955171,
+          "eval_net_savings_ci95_lo": -32.47509718537166,
+          "eval_net_savings_ci95_hi": -31.934022113731764,
+          "eval_preflop_savings_frac": 0.4113614410082998,
+          "eval_token_savings_frac": 0.4061436166372812,
+          "eval_cache_hit_rate": 0.50225,
+          "eval_peak_cache_gb_mean": 652.3184218112,
+          "eval_peak_cache_gb_max": 681.652518912,
+          "eval_mean_cache_gb": 353.20291946659836,
+          "eval_net_savings_memcost_002": -12.6350069952157,
+          "eval_net_savings_memcost_010": -64.8204807401117,
+          "metadata_strategy": "monolithic",
+          "metadata_workload": "high_sharing"
+        },
+        {
+          "input": "workload=high_sharing; strategy=chunk; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-1.9108 [-1.9229, -1.8986]; hit_rate=0.7115; peak_cache_gb=56.0774",
+          "eval_net_savings_mean": -1.9107667360933476,
+          "eval_net_savings_ci95_lo": -1.9229228832887848,
+          "eval_net_savings_ci95_hi": -1.8986105888979103,
+          "eval_preflop_savings_frac": 0.8931045163866529,
+          "eval_token_savings_frac": 0.8436429321267889,
+          "eval_cache_hit_rate": 0.711525,
+          "eval_peak_cache_gb_mean": 56.077425049599995,
+          "eval_peak_cache_gb_max": 57.738264576,
+          "eval_mean_cache_gb": 38.8405053620224,
+          "eval_net_savings_memcost_002": -0.22844398460534734,
+          "eval_net_savings_memcost_010": -4.714637988573348,
+          "metadata_strategy": "chunk",
+          "metadata_workload": "high_sharing"
+        },
+        {
+          "input": "workload=high_sharing; strategy=speculative; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-31.6954 [-31.9620, -31.4288]; hit_rate=0.9980; peak_cache_gb=652.3184",
+          "eval_net_savings_mean": -31.695403657127617,
+          "eval_net_savings_ci95_lo": -31.962024357457857,
+          "eval_net_savings_ci95_hi": -31.428782956797377,
+          "eval_preflop_savings_frac": 0.9205174334323882,
+          "eval_token_savings_frac": 0.8805816348269151,
+          "eval_cache_hit_rate": 0.998,
+          "eval_peak_cache_gb_mean": 652.3184218112,
+          "eval_peak_cache_gb_max": 681.652518912,
+          "eval_mean_cache_gb": 353.20291946659836,
+          "eval_net_savings_memcost_002": -12.125851002791611,
+          "eval_net_savings_memcost_010": -64.31132474768762,
+          "metadata_strategy": "speculative",
+          "metadata_workload": "high_sharing"
+        },
+        {
+          "input": "workload=high_sharing; strategy=restructure; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=0.7413 [0.7404, 0.7422]; hit_rate=0.9970; peak_cache_gb=3.6075",
+          "eval_net_savings_mean": 0.7413214516358642,
+          "eval_net_savings_ci95_lo": 0.7404236129990158,
+          "eval_net_savings_ci95_hi": 0.7422192902727125,
+          "eval_preflop_savings_frac": 0.921695529075864,
+          "eval_token_savings_frac": 0.8821450167335098,
+          "eval_cache_hit_rate": 0.9970000000000001,
+          "eval_peak_cache_gb_mean": 3.6074815488,
+          "eval_peak_cache_gb_max": 3.721920512,
+          "eval_mean_cache_gb": 3.6007421673472004,
+          "eval_net_savings_memcost_002": 0.8495458980998641,
+          "eval_net_savings_memcost_010": 0.560947374195864,
+          "metadata_strategy": "restructure",
+          "metadata_workload": "high_sharing"
+        }
+      ]
+    },
+    {
+      "dataset": "caching_sim_partial_overlap",
+      "examples": [
+        {
+          "input": "workload=partial_overlap; strategy=monolithic; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-27.4930 [-27.5377, -27.4483]; hit_rate=0.0000; peak_cache_gb=549.8597",
+          "eval_net_savings_mean": -27.49298573312,
+          "eval_net_savings_ci95_lo": -27.53769956223518,
+          "eval_net_savings_ci95_hi": -27.448271904004823,
+          "eval_preflop_savings_frac": 0.0,
+          "eval_token_savings_frac": 0.0,
+          "eval_cache_hit_rate": 0.0,
+          "eval_peak_cache_gb_mean": 549.8597146624,
+          "eval_peak_cache_gb_max": 555.798233088,
+          "eval_mean_cache_gb": 275.15578476134397,
+          "eval_net_savings_memcost_002": -10.997194293248,
+          "eval_net_savings_memcost_010": -54.98597146624,
+          "metadata_strategy": "monolithic",
+          "metadata_workload": "partial_overlap"
+        },
+        {
+          "input": "workload=partial_overlap; strategy=chunk; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-8.3324 [-8.3521, -8.3127]; hit_rate=0.3919; peak_cache_gb=178.0845",
+          "eval_net_savings_mean": -8.332399960965478,
+          "eval_net_savings_ci95_lo": -8.352121023772892,
+          "eval_net_savings_ci95_hi": -8.312678898158065,
+          "eval_preflop_savings_frac": 0.5718269369545232,
+          "eval_token_savings_frac": 0.5258213011086313,
+          "eval_cache_hit_rate": 0.39187500000000003,
+          "eval_peak_cache_gb_mean": 178.0845379584,
+          "eval_peak_cache_gb_max": 179.992264704,
+          "eval_mean_cache_gb": 127.1700115685376,
+          "eval_net_savings_memcost_002": -2.989863822213477,
+          "eval_net_savings_memcost_010": -17.23662685888548,
+          "metadata_strategy": "chunk",
+          "metadata_workload": "partial_overlap"
+        },
+        {
+          "input": "workload=partial_overlap; strategy=speculative; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-26.6902 [-26.7351, -26.6453]; hit_rate=0.9900; peak_cache_gb=549.8597",
+          "eval_net_savings_mean": -26.690188007112454,
+          "eval_net_savings_ci95_lo": -26.735095715169404,
+          "eval_net_savings_ci95_hi": -26.645280299055504,
+          "eval_preflop_savings_frac": 0.8027977260075503,
+          "eval_token_savings_frac": 0.763217984674816,
+          "eval_cache_hit_rate": 0.99,
+          "eval_peak_cache_gb_mean": 549.8597146624,
+          "eval_peak_cache_gb_max": 555.798233088,
+          "eval_mean_cache_gb": 275.15578476134397,
+          "eval_net_savings_memcost_002": -10.19439656724045,
+          "eval_net_savings_memcost_010": -54.18317374023245,
+          "metadata_strategy": "speculative",
+          "metadata_workload": "partial_overlap"
+        },
+        {
+          "input": "workload=partial_overlap; strategy=restructure; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=0.2589 [0.2551, 0.2626]; hit_rate=0.9800; peak_cache_gb=10.9169",
+          "eval_net_savings_mean": 0.25887469155145937,
+          "eval_net_savings_ci95_lo": 0.25510287791069763,
+          "eval_net_savings_ci95_hi": 0.2626465051922211,
+          "eval_preflop_savings_frac": 0.8047181373114594,
+          "eval_token_savings_frac": 0.7622583261951486,
+          "eval_cache_hit_rate": 0.9800000000000001,
+          "eval_peak_cache_gb_mean": 10.916868915199998,
+          "eval_peak_cache_gb_max": 11.275862016,
+          "eval_mean_cache_gb": 10.7122597822464,
+          "eval_net_savings_memcost_002": 0.5863807590074595,
+          "eval_net_savings_memcost_010": -0.28696875420854057,
+          "metadata_strategy": "restructure",
+          "metadata_workload": "partial_overlap"
+        }
+      ]
+    },
+    {
+      "dataset": "caching_sim_similar_prefixes",
+      "examples": [
+        {
+          "input": "workload=similar_prefixes; strategy=monolithic; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-60.9411 [-61.0580, -60.8241]; hit_rate=0.0303; peak_cache_gb=1219.3838",
+          "eval_net_savings_mean": -60.94108669502087,
+          "eval_net_savings_ci95_lo": -61.058026194768075,
+          "eval_net_savings_ci95_hi": -60.82414719527367,
+          "eval_preflop_savings_frac": 0.02810464705913322,
+          "eval_token_savings_frac": 0.026922477562619274,
+          "eval_cache_hit_rate": 0.030300000000000004,
+          "eval_peak_cache_gb_mean": 1219.3838268415998,
+          "eval_peak_cache_gb_max": 1233.25382656,
+          "eval_mean_cache_gb": 610.1192372649984,
+          "eval_net_savings_memcost_002": -24.359571889772866,
+          "eval_net_savings_memcost_010": -121.91027803710088,
+          "metadata_strategy": "monolithic",
+          "metadata_workload": "similar_prefixes"
+        },
+        {
+          "input": "workload=similar_prefixes; strategy=chunk; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-3.5743 [-3.5821, -3.5664]; hit_rate=0.7486; peak_cache_gb=88.9580",
+          "eval_net_savings_mean": -3.5742569478335846,
+          "eval_net_savings_ci95_lo": -3.5820920333804644,
+          "eval_net_savings_ci95_hi": -3.5664218622867048,
+          "eval_preflop_savings_frac": 0.8736425363264153,
+          "eval_token_savings_frac": 0.8260318351064713,
+          "eval_cache_hit_rate": 0.7485999999999999,
+          "eval_peak_cache_gb_mean": 88.9579896832,
+          "eval_peak_cache_gb_max": 89.875546112,
+          "eval_mean_cache_gb": 76.89114590904319,
+          "eval_net_savings_memcost_002": -0.9055172573375845,
+          "eval_net_savings_memcost_010": -8.022156431993585,
+          "metadata_strategy": "chunk",
+          "metadata_workload": "similar_prefixes"
+        },
+        {
+          "input": "workload=similar_prefixes; strategy=speculative; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-61.9464 [-61.9871, -61.9056]; hit_rate=0.9990; peak_cache_gb=1257.4720",
+          "eval_net_savings_mean": -61.9463803889014,
+          "eval_net_savings_ci95_lo": -61.987119091712565,
+          "eval_net_savings_ci95_hi": -61.90564168609024,
+          "eval_preflop_savings_frac": 0.9272202664586014,
+          "eval_token_savings_frac": 0.888482902695668,
+          "eval_cache_hit_rate": 0.999,
+          "eval_peak_cache_gb_mean": 1257.4720131072002,
+          "eval_peak_cache_gb_max": 1262.53531136,
+          "eval_mean_cache_gb": 629.3035234623487,
+          "eval_net_savings_memcost_002": -24.2222199956854,
+          "eval_net_savings_memcost_010": -124.81998104426141,
+          "metadata_strategy": "speculative",
+          "metadata_workload": "similar_prefixes"
+        },
+        {
+          "input": "workload=similar_prefixes; strategy=restructure; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=0.8003 [0.7998, 0.8008]; hit_rate=0.9980; peak_cache_gb=2.5182",
+          "eval_net_savings_mean": 0.8002873352090101,
+          "eval_net_savings_ci95_lo": 0.799817065288452,
+          "eval_net_savings_ci95_hi": 0.8007576051295682,
+          "eval_preflop_savings_frac": 0.9261990305690102,
+          "eval_token_savings_frac": 0.8871367421546628,
+          "eval_cache_hit_rate": 0.998,
+          "eval_peak_cache_gb_mean": 2.5182339072,
+          "eval_peak_cache_gb_max": 2.601517056,
+          "eval_mean_cache_gb": 2.5160468922368,
+          "eval_net_savings_memcost_002": 0.87583435242501,
+          "eval_net_savings_memcost_010": 0.67437563984901,
+          "metadata_strategy": "restructure",
+          "metadata_workload": "similar_prefixes"
+        }
+      ]
+    },
+    {
+      "dataset": "caching_sim_variable_ordering",
+      "examples": [
+        {
+          "input": "workload=variable_ordering; strategy=monolithic; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-35.3545 [-35.4065, -35.3026]; hit_rate=0.0000; peak_cache_gb=707.0908",
+          "eval_net_savings_mean": -35.3545388032,
+          "eval_net_savings_ci95_lo": -35.40652468841097,
+          "eval_net_savings_ci95_hi": -35.30255291798903,
+          "eval_preflop_savings_frac": 0.0,
+          "eval_token_savings_frac": 0.0,
+          "eval_cache_hit_rate": 0.0,
+          "eval_peak_cache_gb_mean": 707.090776064,
+          "eval_peak_cache_gb_max": 715.490066432,
+          "eval_mean_cache_gb": 353.9319920001024,
+          "eval_net_savings_memcost_002": -14.14181552128,
+          "eval_net_savings_memcost_010": -70.7090776064,
+          "metadata_strategy": "monolithic",
+          "metadata_workload": "variable_ordering"
+        },
+        {
+          "input": "workload=variable_ordering; strategy=chunk; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-7.0718 [-7.0804, -7.0633]; hit_rate=0.5263; peak_cache_gb=155.2111",
+          "eval_net_savings_mean": -7.071826760059139,
+          "eval_net_savings_ci95_lo": -7.080362647072895,
+          "eval_net_savings_ci95_hi": -7.063290873045383,
+          "eval_preflop_savings_frac": 0.6887300911408627,
+          "eval_token_savings_frac": 0.6388928049612888,
+          "eval_cache_hit_rate": 0.526275,
+          "eval_peak_cache_gb_mean": 155.21113702399998,
+          "eval_peak_cache_gb_max": 156.289204224,
+          "eval_mean_cache_gb": 122.60930650112,
+          "eval_net_savings_memcost_002": -2.415492649339137,
+          "eval_net_savings_memcost_010": -14.832383611259138,
+          "metadata_strategy": "chunk",
+          "metadata_workload": "variable_ordering"
+        },
+        {
+          "input": "workload=variable_ordering; strategy=speculative; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=-34.4945 [-34.5476, -34.4413]; hit_rate=0.9988; peak_cache_gb=707.0908",
+          "eval_net_savings_mean": -34.494485650869535,
+          "eval_net_savings_ci95_lo": -34.547645262243954,
+          "eval_net_savings_ci95_hi": -34.44132603949512,
+          "eval_preflop_savings_frac": 0.860053152330471,
+          "eval_token_savings_frac": 0.8226385546458321,
+          "eval_cache_hit_rate": 0.998775,
+          "eval_peak_cache_gb_mean": 707.090776064,
+          "eval_peak_cache_gb_max": 715.490066432,
+          "eval_mean_cache_gb": 353.9319920001024,
+          "eval_net_savings_memcost_002": -13.28176236894953,
+          "eval_net_savings_memcost_010": -69.84902445406954,
+          "metadata_strategy": "speculative",
+          "metadata_workload": "variable_ordering"
+        },
+        {
+          "input": "workload=variable_ordering; strategy=restructure; simulation of 1000 requests, 40 seeds, cost model L=32,d=4096,h=32,head_dim=128,fp16",
+          "output": "net_savings=0.6593 [0.6573, 0.6613]; hit_rate=0.9940; peak_cache_gb=3.9476",
+          "eval_net_savings_mean": 0.659316757848418,
+          "eval_net_savings_ci95_lo": 0.657304571429474,
+          "eval_net_savings_ci95_hi": 0.6613289442673621,
+          "eval_preflop_savings_frac": 0.8566954612084181,
+          "eval_token_savings_frac": 0.8140094192563208,
+          "eval_cache_hit_rate": 0.994,
+          "eval_peak_cache_gb_mean": 3.9475740672,
+          "eval_peak_cache_gb_max": 4.21003264,
+          "eval_mean_cache_gb": 3.9200662618112005,
+          "eval_net_savings_memcost_002": 0.7777439798644181,
+          "eval_net_savings_memcost_010": 0.46193805448841807,
+          "metadata_strategy": "restructure",
+          "metadata_workload": "variable_ordering"
+        }
+      ]
+    }
+  ]
+}

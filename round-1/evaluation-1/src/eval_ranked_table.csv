@@ -1,0 +1,5 @@
+rank,strategy,mean_net_savings_all_workloads,mean_hit_rate,mean_peak_cache_gb,n_workloads_beating_baseline_10pct,survives_for_iteration_2,decision_note
+1,restructure,0.6150,0.9923,5.2475,4,True,beat baseline by >=10% on 4/4 workloads
+2,chunk,-5.2223,0.5946,119.5828,0,False,only 0/4 workloads >=10% better
+3,speculative,-38.7066,0.9964,791.6852,0,False,only 0/4 workloads >=10% better
+4,monolithic,-38.9983,0.1331,782.1632,0,False,baseline (reference strategy)
